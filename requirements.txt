@@ -1,0 +1,21 @@
+# Core runtime
+torch>=2.0.0
+transformers>=4.41.0
+sentencepiece>=0.1.99
+sacremoses>=0.0.53
+indic-nlp-library
+
+# ASR (Automatic Speech Recognition)
+openai-whisper>=20231117
+soundfile>=0.12.1
+pydub>=0.25.1
+
+# TTS (Text-to-Speech). pyttsx3 is offline and cross-platform.
+pyttsx3>=2.90
+
+# Web demo
+streamlit>=1.36.0
+
+# Utilities
+langcodes>=3.4.0
+numpy>=1.26.0
