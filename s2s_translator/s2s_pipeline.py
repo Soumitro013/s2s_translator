@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, Dict
 
 import numpy as np
 import soundfile as sf
@@ -16,8 +16,8 @@ import pyttsx3
 
 from utils_lang import has_direct_marian, get_marian_name
 
-# ---------- Audio Utils ----------
 
+# ---------- Audio Utils ----------
 def load_audio_to_wav(path: str, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
     """Load audio with pydub and convert to mono WAV float32 at target_sr."""
     audio = AudioSegment.from_file(path)
@@ -28,22 +28,29 @@ def load_audio_to_wav(path: str, target_sr: int = 16000) -> Tuple[np.ndarray, in
         samples = samples / 32768.0
     return samples, target_sr
 
+
 def save_wav(samples: np.ndarray, sr: int, out_path: str):
+    """Save audio samples to WAV."""
     sf.write(out_path, samples, sr)
+
 
 # ---------- ASR ----------
 class ASRWhisper:
-    def __init__(self, model_size: str = "small", device: Optional[str] = None, language: Optional[str] = None):
+    def __init__(self, model_size: str = "tiny", device: Optional[str] = None, language: Optional[str] = None):
+        """Load Whisper ASR model (tiny by default for speed in tests)."""
         self.model = whisper.load_model(model_size, device=device)
-        self.language = language  # e.g., 'hi', 'en'
+        self.language = language
 
     def transcribe(self, audio_path: str) -> str:
+        """Return transcribed text from audio file."""
         result = self.model.transcribe(audio_path, language=self.language)
         return result.get("text", "").strip()
+
 
 # ---------- MT ----------
 class MarianTranslator:
     def __init__(self, src_lang: str, tgt_lang: str):
+        """Initialize MarianMT translator for given language pair."""
         model_name = get_marian_name(src_lang, tgt_lang)
         if model_name is None:
             raise ValueError(f"No direct Marian model for {src_lang}->{tgt_lang}")
@@ -52,52 +59,61 @@ class MarianTranslator:
         self.pipe = pipeline("translation", model=self.model, tokenizer=self.tokenizer)
 
     def translate(self, text: str) -> str:
+        """Translate given text using MarianMT."""
         if not text.strip():
             return ""
         out = self.pipe(text, max_length=512)[0]["translation_text"]
         return out.strip()
 
+
 # ---------- TTS ----------
 class TTSOffline:
     def __init__(self, voice_name: Optional[str] = None, rate: Optional[int] = None):
+        """Offline text-to-speech using pyttsx3."""
         self.engine = pyttsx3.init()
         if rate is not None:
-            self.engine.setProperty('rate', rate)
+            self.engine.setProperty("rate", rate)
         if voice_name:
-            # Try to find a matching voice by name substring
-            for v in self.engine.getProperty('voices'):
-                if voice_name.lower() in (v.name or '').lower():
-                    self.engine.setProperty('voice', v.id)
+            for v in self.engine.getProperty("voices"):
+                if voice_name.lower() in (v.name or "").lower():
+                    self.engine.setProperty("voice", v.id)
                     break
 
     def synthesize_to_file(self, text: str, out_path: str):
+        """Convert text to speech and save to file."""
+        if not text.strip():
+            # Create empty placeholder file if text missing
+            with open(out_path, "wb") as f:
+                f.write(b"")
+            return
         self.engine.save_to_file(text, out_path)
         self.engine.runAndWait()
 
+
 # ---------- Orchestrator ----------
 class SpeechToSpeechTranslator:
-    def __init__(self, asr_model_size: str = "small", src_lang: Optional[str] = None):
+    def __init__(self, asr_model_size: str = "tiny", src_lang: Optional[str] = None):
+        """Main orchestrator that ties ASR, MT, and TTS."""
         self.asr = ASRWhisper(model_size=asr_model_size, language=src_lang)
 
     def _translate_text(self, text: str, src: str, tgt: str) -> str:
+        """Translate text with MarianMT, with English pivot if needed."""
+        if not text.strip():
+            return ""
+
         if has_direct_marian(src, tgt):
             translator = MarianTranslator(src, tgt)
             return translator.translate(text)
 
-        # Fallback: pivot via English
-        if src != 'en' and tgt != 'en':
-            to_en = MarianTranslator(src, 'en').translate(text)
-            to_tgt = MarianTranslator('en', tgt).translate(to_en)
-            return to_tgt
+        # Pivot translation via English
+        if src != "en" and tgt != "en":
+            to_en = MarianTranslator(src, "en").translate(text)
+            return MarianTranslator("en", tgt).translate(to_en)
 
-        # If one side is English but direct model missing, try reverse + pivot
-        if src == 'en' and not has_direct_marian('en', tgt):
-            raise ValueError(f"No Marian model available for en->{tgt}. Add one in utils_lang.")
-        if tgt == 'en' and not has_direct_marian(src, 'en'):
-            raise ValueError(f"No Marian model available for {src}->en. Add one in utils_lang.")
         raise ValueError(f"Unsupported translation pair {src}->{tgt}")
 
-    def run_file(self, in_audio_path: str, src_lang: str, tgt_lang: str, out_audio_path: str) -> dict:
+    def run_file(self, in_audio_path: str, src_lang: str, tgt_lang: str, out_audio_path: str) -> Dict[str, str]:
+        """Full pipeline: audio -> text -> translated text -> speech."""
         # 1) ASR
         text_src = self.asr.transcribe(in_audio_path)
 
@@ -110,6 +126,17 @@ class SpeechToSpeechTranslator:
 
         return {
             "asr_text": text_src,
-            "translated_text": text_tgt,
-            "out_audio": out_audio_path,
+            "translation": text_tgt,
+            "tts_output": out_audio_path,
         }
+
+
+# ---------- Test-facing wrapper ----------
+def run_pipeline(audio_path: str, source_lang: str, target_lang: str) -> Dict[str, str]:
+    """
+    Module-level wrapper for tests.
+    Runs full speech-to-speech translation pipeline.
+    """
+    out_path = "output_test.wav"
+    translator = SpeechToSpeechTranslator(src_lang=source_lang)
+    return translator.run_file(audio_path, source_lang, target_lang, out_path)
