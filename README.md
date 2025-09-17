@@ -55,7 +55,7 @@ s2s-translator/
 
 ### Clone the repository
 ```bash
-git clone https://github.com/yourusername/s2s-translator.git
+git clone https://github.com/Soumitro013/s2s-translator.git
 cd s2s-translator
 ```
 
