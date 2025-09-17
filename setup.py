@@ -10,15 +10,18 @@ setup(
     license="MIT",
     packages=find_packages(),
     install_requires=[
-        "torch>=2.0.0",
-        "transformers>=4.30.0",
-        "openai-whisper",
-        "streamlit>=1.20.0",
-        "gTTS>=2.3.0",
-        "pyttsx3>=2.90",
-        "pydub>=0.25.1",
-        "soundfile>=0.12.1",
-        "numpy>=1.24.0",
+    "torch>=2.0.0",
+    "transformers>=4.41.0",
+    "sentencepiece>=0.1.99",
+    "sacremoses>=0.0.53",
+    "indic-nlp-library",
+    "openai-whisper>=20231117",
+    "soundfile>=0.12.1",
+    "pydub>=0.25.1",
+    "pyttsx3>=2.90",
+    "streamlit>=1.36.0"
+    "langcodes>=3.4.0",
+    "numpy>=1.26.0"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
