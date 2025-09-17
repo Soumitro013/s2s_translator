@@ -135,9 +135,9 @@ tests/test_pipeline.py .                                           [100%]
 If you use this software in your research, please cite:
 
 ```bibtex
-@article{YourName2025s2s,
+@article{Soumitro2025s2s,
   title={An Open-Source Speech-to-Speech Translation Pipeline for Indic Languages},
-  author={Your Name},
+  author={Soumitro Mukherjee},
   journal={Journal of Open Source Software},
   year={2025}
 }
